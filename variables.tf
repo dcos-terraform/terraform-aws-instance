@@ -90,3 +90,13 @@ variable "extra_volume_name_format" {
   description = "Printf style format for naming the extra volumes. Inputs are cluster_name and instance ID."
   default     = "extra-volumes-%s-%s"
 }
+
+variable "private_ip_list" {
+  description = "List of private IP addresses used to associate to associate all instances within the module."
+  default     = []
+}
+
+variable "ami_list" {
+  description = "List of custom AMIs used to associate to associate all instances within the module."
+  default     = []
+}
