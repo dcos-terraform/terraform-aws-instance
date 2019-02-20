@@ -68,14 +68,14 @@ module "dcos-tested-oses" {
 
 resource "aws_instance" "instance" {
   instance_type = "${var.instance_type}"
-  ami           = "${length(var.ami_list) >= count.index ? element(var.ami_list, count.index) : coalesce(var.ami, module.dcos-tested-oses.aws_ami)}"
+  ami           = "${length(var.ami_list) >= count.index ? element(concat(var.ami_list, list("")), count.index) : coalesce(var.ami, module.dcos-tested-oses.aws_ami)}"
 
   count                       = "${var.num}"
   key_name                    = "${var.key_name}"
   vpc_security_group_ids      = ["${var.security_group_ids}"]
   associate_public_ip_address = "${var.associate_public_ip_address}"
   iam_instance_profile        = "${var.iam_instance_profile}"
-  private_ip                  = "${length(var.private_ip_list) >= count.index ? element(var.private_ip_list, count.index) : ""}"
+  private_ip                  = "${length(var.private_ip_list) >= count.index ? element(concat(var.private_ip_list, list("")), count.index) : ""}"
 
   # availability_zone = "${element(var.availability_zones, count.index % length(var.availability_zones)}"
   subnet_id = "${element(var.subnet_ids, count.index % length(var.subnet_ids))}"
