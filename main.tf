@@ -68,7 +68,7 @@ module "dcos-tested-oses" {
 
 resource "aws_instance" "instance" {
   instance_type = "${var.instance_type}"
-  ami           = "${count.index < length(var.ami_list) ? element(concat(var.ami_list, list("")), count.index) : coalesce(var.ami, module.dcos-tested-oses.aws_ami)}"
+  ami           = "${element(concat(var.ami_list, list("")), count.index) == "" ? coalesce(var.ami, module.dcos-tested-oses.aws_ami): element(concat(var.ami_list, list("")), count.index)}"
 
   count                       = "${var.num}"
   key_name                    = "${var.key_name}"
