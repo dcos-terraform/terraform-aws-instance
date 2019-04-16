@@ -135,9 +135,9 @@ resource "null_resource" "instance-prereq" {
   count = "${coalesce(var.ami, var.user_data) == "" ? var.num : 0}"
 
   connection {
-    host = "${var.associate_public_ip_address ? element(aws_instance.instance.*.public_ip, count.index) : element(aws_instance.instance.*.private_ip, count.index)}"
-    user = "${module.dcos-tested-oses.user}"
-    agent= true
+    host  = "${var.associate_public_ip_address ? element(aws_instance.instance.*.public_ip, count.index) : element(aws_instance.instance.*.private_ip, count.index)}"
+    user  = "${module.dcos-tested-oses.user}"
+    agent = true
   }
 
   provisioner "file" {
