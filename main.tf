@@ -92,7 +92,8 @@ resource "aws_instance" "instance" {
     delete_on_termination = true
   }
 
-  user_data = "${var.user_data}"
+  user_data         = "${var.user_data}"
+  get_password_data = "${var.get_password_data}"
 
   lifecycle {
     ignore_changes = ["user_data", "ami"]

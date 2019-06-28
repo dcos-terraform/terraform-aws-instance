@@ -95,3 +95,8 @@ variable "extra_volume_name_format" {
   description = "Printf style format for naming the extra volumes. Inputs are cluster_name and instance ID."
   default     = "extra-volumes-%s-%s"
 }
+
+variable "get_password_data" {
+  description = "If true, wait for password data to become available and retrieve it. Useful for getting the administrator password for instances running Microsoft Windows"
+  default     = false
+}

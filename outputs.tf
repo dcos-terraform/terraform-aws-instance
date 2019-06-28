@@ -22,3 +22,7 @@ output "prereq-id" {
   description = "Returns the ID of the prereq script (if user_data or ami are not used)"
   value       = ""
 }
+
+output "password_data" {
+  value = "${aws_instance.instance.*.password_data}"
+}
