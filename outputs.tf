@@ -24,5 +24,6 @@ output "prereq-id" {
 }
 
 output "password_data" {
+  description = "Return a list of encrypted password data for Windows instances"
   value = "${aws_instance.instance.*.password_data}"
 }

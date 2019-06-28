@@ -55,6 +55,7 @@ module "dcos-master-instance" {
 | dcos\_instance\_os | Operating system to use. Instead of using your own AMI you could use a provided OS. | string | `"centos_7.4"` | no |
 | extra\_volume\_name\_format | Printf style format for naming the extra volumes. Inputs are cluster_name and instance ID. | string | `"extra-volumes-%s-%s"` | no |
 | extra\_volumes | Extra volumes for each instance | list | `<list>` | no |
+| get\_password\_data | If true, wait for password data to become available and retrieve it. Useful for getting the administrator password for instances running Microsoft Windows | string | `"false"` | no |
 | hostname\_format | Format the hostname inputs are index+1, region, cluster_name | string | `"%[3]s-instance%[1]d-%[2]s"` | no |
 | iam\_instance\_profile | The instance profile to be used for these instances | string | `""` | no |
 | instance\_type | Instance Type | string | `"m4.large"` | no |
@@ -71,6 +72,7 @@ module "dcos-master-instance" {
 |------|-------------|
 | instances | List of instance IDs |
 | os\_user | The OS user to be used |
+| password\_data | Return a list of encrypted password data for Windows instances |
 | prereq-id | Returns the ID of the prereq script (if user_data or ami are not used) |
 | private\_ips | List of private ip addresses created by this module |
 | public\_ips | List of public ip addresses created by this module |
