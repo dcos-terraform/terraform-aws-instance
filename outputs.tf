@@ -18,11 +18,6 @@ output "os_user" {
   value       = "${module.dcos-tested-oses.user}"
 }
 
-output "prereq-id" {
-  description = "Returns the ID of the prereq script (if user_data or ami are not used)"
-  value       = ""
-}
-
 output "password_data" {
   description = "Return a list of encrypted password data for Windows instances"
   value       = "${aws_instance.instance.*.password_data}"
