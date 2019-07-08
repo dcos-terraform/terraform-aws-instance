@@ -73,7 +73,6 @@ module "dcos-master-instance" {
 | instances | List of instance IDs |
 | os\_user | The OS user to be used |
 | password\_data | Return a list of encrypted password data for Windows instances |
-| prereq-id | Returns the ID of the prereq script (if user_data or ami are not used) |
 | private\_ips | List of private ip addresses created by this module |
 | public\_ips | List of public ip addresses created by this module |
 
