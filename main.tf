@@ -124,6 +124,10 @@ resource "aws_ebs_volume" "volume" {
                                var.cluster_name,
                                element(aws_instance.instance.*.id, count.index / local.num_extra_volumes)),
                 "Cluster", var.cluster_name))}"
+
+  lifecycle {
+    ignore_changes = ["instance_id"]
+  }
 }
 
 resource "aws_volume_attachment" "volume-attachment" {
@@ -132,4 +136,8 @@ resource "aws_volume_attachment" "volume-attachment" {
   volume_id    = "${element(aws_ebs_volume.volume.*.id, count.index)}"
   instance_id  = "${element(aws_instance.instance.*.id, count.index / local.num_extra_volumes)}"
   force_detach = true
+
+  lifecycle {
+    ignore_changes = ["instance_id", "vol_id"]
+  }
 }
