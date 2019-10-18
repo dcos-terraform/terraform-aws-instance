@@ -95,6 +95,9 @@ resource "aws_instance" "instance" {
     delete_on_termination = true
   }
 
+  volume_tags = "${merge(var.tags, map("Name", format("root-volume-${var.hostname_format}", (count.index + 1), local.region, local.cluster_name),
+                                "Cluster", var.cluster_name))}"
+
   user_data         = "${var.user_data}"
   get_password_data = "${var.get_password_data}"
 
