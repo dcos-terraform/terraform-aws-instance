@@ -14,7 +14,7 @@ variable "cluster_name" {
 
 variable "tags" {
   description = "Add custom tags to all resources"
-  type        = "map"
+  type        = map(string)
   default     = {}
 }
 
@@ -48,12 +48,12 @@ variable "extra_volumes" {
 
 variable "subnet_ids" {
   description = "List of subnet IDs created in this network"
-  type        = "list"
+  type        = list(string)
 }
 
 variable "security_group_ids" {
   description = "Firewall IDs to use for these instances"
-  type        = "list"
+  type        = list(string)
 }
 
 variable "iam_instance_profile" {
@@ -100,3 +100,4 @@ variable "get_password_data" {
   description = "If true, wait for password data to become available and retrieve it. Useful for getting the administrator password for instances running Microsoft Windows"
   default     = false
 }
+
