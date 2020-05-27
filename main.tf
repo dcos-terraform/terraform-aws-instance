@@ -27,15 +27,15 @@
  *
  *   extra_volumes = [
  *     {
- *       size        = "100"
+ *       size        = 100
  *       type        = "gp2"
- *       iops        = "3000"
+ *       iops        = null
  *       device_name = "/dev/xvdi"
  *     },
  *     {
- *       size        = "1000"
- *       type        = ""     # Use AWS default.
- *       iops        = "0"    # Use AWS default.
+ *       size        = 1000
+ *       type        = ""      # Use AWS default.
+ *       iops        = 0       # Use AWS default.      
  *       device_name = "/dev/xvdj"
  *     }
  *   ]
@@ -53,21 +53,6 @@ data "aws_region" "current" {
 locals {
   cluster_name = var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name
   region       = var.region != "" ? var.region : data.aws_region.current.name
-
-  # NOTE: This is to workaround the divide by zero warning from Terraform.
-  num_extra_volumes = length(var.extra_volumes) > 0 ? length(var.extra_volumes) : 1
-
-  # NOTE: This is to make "lookup" happy. Otherwise, it will complain
-  # about the type cannot be derived if "var.extra_volumes" is not
-  # set.
-  extra_volumes = concat(
-    var.extra_volumes,
-    [
-      {
-        "dummy" = "dummy"
-      },
-    ],
-  )
 }
 
 module "dcos-tested-oses" {
@@ -90,7 +75,6 @@ resource "aws_instance" "instance" {
   associate_public_ip_address = var.associate_public_ip_address
   iam_instance_profile        = var.iam_instance_profile
 
-  # availability_zone = "${element(var.availability_zones, count.index % length(var.availability_zones)}"
   subnet_id = element(var.subnet_ids, count.index % length(var.subnet_ids))
 
   tags = merge(
@@ -136,37 +120,80 @@ resource "aws_instance" "instance" {
     ]
   }
 }
+/*
+data "aws_instance" "created" {
+  count = var.num
+  
+  filter {
+    name = "tag:Name"
+    values = [format(
+        var.hostname_format,
+        count.index + 1,
+        local.region,
+        local.cluster_name,
+    )]
+  }
+  
+  filter {
+    name = "tag:Cluster"
+    values = [var.cluster_name]
+  }
 
+  filter {
+    name = "tag:KubernetesCluster"
+    values = [var.cluster_name]
+  }
+}
+*/
+locals {
+  instance_extravolume_list = length(var.extra_volumes) > 0 ? flatten([
+    for instance in aws_instance.instance: [
+      for volume in var.extra_volumes[*] : {
+        "${index(aws_instance.instance, instance) + 1}-${volume.device_name}" = {
+          "instance"          = instance.id
+          "availability_zone" = instance.availability_zone
+          "device_name"       = volume.device_name
+	  "iops"              = volume.iops
+	  "size"              = volume.size
+	  "type"              = volume.type
+        }
+      }
+    ]
+  ]) : null
+  
+  instance_extravolume = local.instance_extravolume_list == null ? {} : {for item in local.instance_extravolume_list: keys(item)[0] => values(item)[0]}
+}
+
+/*
+output "instance_extravolume_output" {
+  value = local.instance_extravolume
+}
+*/
+ 
 resource "aws_ebs_volume" "volume" {
-  # We group volumes from one instance first. For instance:
-  # - length(var.extra_volumes) = 2 (volumes)
-  # - var.num = 3 (instances)
-  #
-  # We will get:
-  # - volume.0 (instance 0)
-  # - volume.1 (instance 0)
-  # - volume.2 (instance 1)
-  # - volume.3 (instance 1)
-  # - volume.4 (instance 2)
-  # - volume.5 (instance 2)
-  count = var.num * length(var.extra_volumes)
+  # Extra volumes are grouped by instance first. For example:
+  # - 1-volume1 (instance 0)
+  # - 1-volume2 (instance 0)
+  # - 2-volume1 (instance 1)
+  # - 2-volume2 (instance 1)
+  # - 3-volume1 (instance 2)
+  # - 3-volume2 (instance 2)
 
-  availability_zone = element(
-    aws_instance.instance[*].availability_zone,
-    floor(count.index / local.num_extra_volumes),
-  )
+  for_each = local.instance_extravolume  
+  availability_zone = each.value.availability_zone
+
   size = lookup(
-    local.extra_volumes[count.index % local.num_extra_volumes],
+    each.value,
     "size",
     "120",
   )
   type = lookup(
-    local.extra_volumes[count.index % local.num_extra_volumes],
+    each.value,
     "type",
     "",
   )
   iops = lookup(
-    local.extra_volumes[count.index % local.num_extra_volumes],
+    each.value,
     "iops",
     "0",
   )
@@ -177,10 +204,7 @@ resource "aws_ebs_volume" "volume" {
       "Name" = format(
         var.extra_volume_name_format,
         var.cluster_name,
-        element(
-          aws_instance.instance[*].id,
-          floor(count.index / local.num_extra_volumes),
-        ),
+        each.key,
       )
       "Cluster" = var.cluster_name
     },
@@ -189,17 +213,12 @@ resource "aws_ebs_volume" "volume" {
 }
 
 resource "aws_volume_attachment" "volume-attachment" {
-  count = var.num * length(var.extra_volumes)
-  device_name = lookup(
-    local.extra_volumes[count.index % local.num_extra_volumes],
-    "device_name",
-    "dummy",
-  )
-  volume_id = element(aws_ebs_volume.volume[*].id, count.index)
-  instance_id = element(
-    aws_instance.instance[*].id,
-    floor(count.index / local.num_extra_volumes),
-  )
+  for_each = local.instance_extravolume
+  
+  device_name = each.value.device_name
+  volume_id = aws_ebs_volume.volume[each.key].id
+  instance_id = each.value.instance_id
+  
   force_detach = true
 
   lifecycle {
