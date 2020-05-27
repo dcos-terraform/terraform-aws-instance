@@ -82,7 +82,7 @@ module "dcos-tested-oses" {
 
 resource "aws_instance" "instance" {
   instance_type = var.instance_type
-  ami           = coalesce(var.ami, module.dcos-tested-oses.aws_ami)
+  ami           = coalesce(var.ami, module.dcos-tested-oses.aws_ami, false)
 
   count                       = var.num
   key_name                    = var.key_name
