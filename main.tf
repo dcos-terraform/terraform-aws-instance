@@ -71,7 +71,8 @@ locals {
 }
 
 module "dcos-tested-oses" {
-  source = "../terraform-aws-tested-oses"
+  source  = "dcos-terraform/tested-oses/aws"
+  version = "~> 0.3.0"
 
   providers = {
     aws = aws
