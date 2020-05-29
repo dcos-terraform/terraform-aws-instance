@@ -56,7 +56,7 @@ locals {
 }
 
 module "dcos-tested-oses" {
-  source = "../terraform-aws-tested-oses"
+  source = "dcos-terraform/tested-oses/aws"
 
   providers = {
     aws = aws
@@ -120,56 +120,26 @@ resource "aws_instance" "instance" {
     ]
   }
 }
-/*
-data "aws_instance" "created" {
-  count = var.num
-  
-  filter {
-    name = "tag:Name"
-    values = [format(
-        var.hostname_format,
-        count.index + 1,
-        local.region,
-        local.cluster_name,
-    )]
-  }
-  
-  filter {
-    name = "tag:Cluster"
-    values = [var.cluster_name]
-  }
 
-  filter {
-    name = "tag:KubernetesCluster"
-    values = [var.cluster_name]
-  }
-}
-*/
 locals {
   instance_extravolume_list = length(var.extra_volumes) > 0 ? flatten([
-    for instance in aws_instance.instance: [
+    for instance in aws_instance.instance : [
       for volume in var.extra_volumes[*] : {
         "${index(aws_instance.instance, instance) + 1}-${volume.device_name}" = {
           "instance"          = instance.id
           "availability_zone" = instance.availability_zone
           "device_name"       = volume.device_name
-	  "iops"              = volume.iops
-	  "size"              = volume.size
-	  "type"              = volume.type
+          "iops"              = volume.iops
+          "size"              = volume.size
+          "type"              = volume.type
         }
       }
     ]
   ]) : null
-  
-  instance_extravolume = local.instance_extravolume_list == null ? {} : {for item in local.instance_extravolume_list: keys(item)[0] => values(item)[0]}
+
+  instance_extravolume = local.instance_extravolume_list == null ? {} : { for item in local.instance_extravolume_list : keys(item)[0] => values(item)[0] }
 }
 
-/*
-output "instance_extravolume_output" {
-  value = local.instance_extravolume
-}
-*/
- 
 resource "aws_ebs_volume" "volume" {
   # Extra volumes are grouped by instance first. For example:
   # - 1-volume1 (instance 0)
@@ -179,7 +149,7 @@ resource "aws_ebs_volume" "volume" {
   # - 3-volume1 (instance 2)
   # - 3-volume2 (instance 2)
 
-  for_each = local.instance_extravolume  
+  for_each          = local.instance_extravolume
   availability_zone = each.value.availability_zone
 
   size = lookup(
@@ -214,11 +184,11 @@ resource "aws_ebs_volume" "volume" {
 
 resource "aws_volume_attachment" "volume-attachment" {
   for_each = local.instance_extravolume
-  
+
   device_name = each.value.device_name
-  volume_id = aws_ebs_volume.volume[each.key].id
+  volume_id   = aws_ebs_volume.volume[each.key].id
   instance_id = each.value.instance_id
-  
+
   force_detach = true
 
   lifecycle {
