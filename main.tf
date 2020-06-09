@@ -17,7 +17,7 @@
  *```hcl
  * module "dcos-master-instance" {
  *   source  = "terraform-dcos/instance/aws"
- *   version = "~> 0.2.0"
+ *   version = "~> 0.3.0"
  *
  *   cluster_name = "production"
  *   subnet_ids = ["subnet-12345678"]
@@ -43,66 +43,98 @@
  *```
  */
 
-provider "aws" {}
+provider "aws" {
+}
 
-data "aws_region" "current" {}
+data "aws_region" "current" {
+}
 
 // If name_prefix exists, merge it into the cluster_name
 locals {
-  cluster_name = "${var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name}"
-  region       = "${var.region != "" ? var.region : data.aws_region.current.name}"
+  cluster_name = var.name_prefix != "" ? "${var.name_prefix}-${var.cluster_name}" : var.cluster_name
+  region       = var.region != "" ? var.region : data.aws_region.current.name
 
   # NOTE: This is to workaround the divide by zero warning from Terraform.
-  num_extra_volumes = "${length(var.extra_volumes) > 0 ? length(var.extra_volumes) : 1}"
+  num_extra_volumes = length(var.extra_volumes) > 0 ? length(var.extra_volumes) : 1
 
   # NOTE: This is to make "lookup" happy. Otherwise, it will complain
   # about the type cannot be derived if "var.extra_volumes" is not
   # set.
-  extra_volumes = "${concat(var.extra_volumes, list(map("dummy", "dummy")))}"
+  extra_volumes = concat(
+    var.extra_volumes,
+    [
+      {
+        "dummy" = "dummy"
+      },
+    ],
+  )
 }
 
 module "dcos-tested-oses" {
   source  = "dcos-terraform/tested-oses/aws"
-  version = "~> 0.2.0"
+  version = "~> 0.3.0"
 
   providers = {
-    aws = "aws"
+    aws = aws
   }
 
-  os = "${var.dcos_instance_os}"
+  os = var.dcos_instance_os
 }
 
 resource "aws_instance" "instance" {
-  instance_type = "${var.instance_type}"
-  ami           = "${coalesce(var.ami, module.dcos-tested-oses.aws_ami)}"
+  instance_type = var.instance_type
+  ami           = coalesce(var.ami, module.dcos-tested-oses.aws_ami, false)
 
-  count                       = "${var.num}"
-  key_name                    = "${var.key_name}"
-  vpc_security_group_ids      = ["${var.security_group_ids}"]
-  associate_public_ip_address = "${var.associate_public_ip_address}"
-  iam_instance_profile        = "${var.iam_instance_profile}"
+  count                       = var.num
+  key_name                    = var.key_name
+  vpc_security_group_ids      = var.security_group_ids
+  associate_public_ip_address = var.associate_public_ip_address
+  iam_instance_profile        = var.iam_instance_profile
 
   # availability_zone = "${element(var.availability_zones, count.index % length(var.availability_zones)}"
-  subnet_id = "${element(var.subnet_ids, count.index % length(var.subnet_ids))}"
+  subnet_id = element(var.subnet_ids, count.index % length(var.subnet_ids))
 
-  tags = "${merge(var.tags, map("Name", format(var.hostname_format, (count.index + 1), local.region, local.cluster_name),
-                                "Cluster", var.cluster_name,
-                                "KubernetesCluster", var.cluster_name))}"
+  tags = merge(
+    var.tags,
+    {
+      "Name" = format(
+        var.hostname_format,
+        count.index + 1,
+        local.region,
+        local.cluster_name,
+      )
+      "Cluster"           = var.cluster_name
+      "KubernetesCluster" = var.cluster_name
+    },
+  )
 
   root_block_device {
-    volume_size           = "${var.root_volume_size}"
-    volume_type           = "${var.root_volume_type}"
+    volume_size           = var.root_volume_size
+    volume_type           = var.root_volume_type
     delete_on_termination = true
   }
 
-  volume_tags = "${merge(var.tags, map("Name", format("root-volume-${var.hostname_format}", (count.index + 1), local.region, local.cluster_name),
-                                "Cluster", var.cluster_name))}"
+  volume_tags = merge(
+    var.tags,
+    {
+      "Name" = format(
+        "root-volume-${var.hostname_format}",
+        count.index + 1,
+        local.region,
+        local.cluster_name,
+      )
+      "Cluster" = var.cluster_name
+    },
+  )
 
-  user_data         = "${var.user_data}"
-  get_password_data = "${var.get_password_data}"
+  user_data         = var.user_data
+  get_password_data = var.get_password_data
 
   lifecycle {
-    ignore_changes = ["user_data", "ami"]
+    ignore_changes = [
+      user_data,
+      ami,
+    ]
   }
 }
 
@@ -118,32 +150,64 @@ resource "aws_ebs_volume" "volume" {
   # - volume.3 (instance 1)
   # - volume.4 (instance 2)
   # - volume.5 (instance 2)
-  count = "${var.num * length(var.extra_volumes)}"
+  count = var.num * length(var.extra_volumes)
 
-  availability_zone = "${element(aws_instance.instance.*.availability_zone, count.index / local.num_extra_volumes)}"
-  size              = "${lookup(local.extra_volumes[count.index % local.num_extra_volumes], "size", "120")}"
-  type              = "${lookup(local.extra_volumes[count.index % local.num_extra_volumes], "type", "")}"
-  iops              = "${lookup(local.extra_volumes[count.index % local.num_extra_volumes], "iops", "0")}"
+  availability_zone = element(
+    aws_instance.instance[*].availability_zone,
+    floor(count.index / local.num_extra_volumes),
+  )
+  size = lookup(
+    local.extra_volumes[count.index % local.num_extra_volumes],
+    "size",
+    "120",
+  )
+  type = lookup(
+    local.extra_volumes[count.index % local.num_extra_volumes],
+    "type",
+    "",
+  )
+  iops = lookup(
+    local.extra_volumes[count.index % local.num_extra_volumes],
+    "iops",
+    "0",
+  )
 
-  tags = "${merge(var.tags, map(
-                "Name", format(var.extra_volume_name_format,
-                               var.cluster_name,
-                               element(aws_instance.instance.*.id, count.index / local.num_extra_volumes)),
-                "Cluster", var.cluster_name))}"
+  tags = merge(
+    var.tags,
+    {
+      "Name" = format(
+        var.extra_volume_name_format,
+        var.cluster_name,
+        element(
+          aws_instance.instance[*].id,
+          floor(count.index / local.num_extra_volumes),
+        ),
+      )
+      "Cluster" = var.cluster_name
+    },
+  )
 
-  lifecycle {
-    ignore_changes = ["instance_id"]
-  }
 }
 
 resource "aws_volume_attachment" "volume-attachment" {
-  count        = "${var.num * length(var.extra_volumes)}"
-  device_name  = "${lookup(local.extra_volumes[count.index % local.num_extra_volumes], "device_name", "dummy")}"
-  volume_id    = "${element(aws_ebs_volume.volume.*.id, count.index)}"
-  instance_id  = "${element(aws_instance.instance.*.id, count.index / local.num_extra_volumes)}"
+  count = var.num * length(var.extra_volumes)
+  device_name = lookup(
+    local.extra_volumes[count.index % local.num_extra_volumes],
+    "device_name",
+    "dummy",
+  )
+  volume_id = element(aws_ebs_volume.volume[*].id, count.index)
+  instance_id = element(
+    aws_instance.instance[*].id,
+    floor(count.index / local.num_extra_volumes),
+  )
   force_detach = true
 
   lifecycle {
-    ignore_changes = ["instance_id", "vol_id"]
+    ignore_changes = [
+      instance_id,
+      volume_id,
+    ]
   }
 }
+
